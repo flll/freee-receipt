@@ -1,0 +1,10 @@
+[anthropic]
+api_key = アンソロピックAPIキー
+
+[freee]
+token_url = https://accounts.secure.freee.co.jp/public_api/token
+redirect_uri = urn:ietf:wg:oauth:2.0:oob
+company_id = 事業者ID
+client_id = クライアントID
+client_secret = クライアントシークレット
+code = 初期認可コード(10分以内)
