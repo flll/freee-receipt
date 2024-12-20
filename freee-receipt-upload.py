@@ -2,6 +2,7 @@ import anthropic
 import os
 import glob
 import configparser
+import json
 from get_freee_token import get_current_token, refresh_token
 
 
@@ -79,9 +80,31 @@ for jpg_file in jpg_files:
     # message_batchからの内容更新は維持
     for result in client.beta.messages.batches.results(batch_id):
         if result.result.type == "succeeded":
-            import json
             message_text = result.result.message.content[0].text
+
+            if message_text.startswith('<output>'):
+                message_text = message_text.replace('<output>', '').replace('</output>', '').strip()
+
             message_content = json.loads(message_text)
+            message_content['description'] = message_content['description'][:255]
+
+            if 'qualified_invoice' in message_content:
+                invoice_num = message_content['qualified_invoice']
+                if invoice_num.startswith('T') and len(invoice_num) == 14:
+                    try:
+                        sel_reg_no = invoice_num[1:]
+                        url = f"https://www.invoice-kohyo.nta.go.jp/regno-search/detail?selRegNo={sel_reg_no}"
+                        response = requests.get(url)
+
+                        from bs4 import BeautifulSoup
+                        soup = BeautifulSoup(response.text, 'html.parser')
+
+                        company_name = soup.select_one('p.itemdata.sp_nmTsuushou_data')
+                        if company_name:
+                            message_content['partner_name'] = company_name.text.strip()
+                    except Exception as e:
+                        print(f"Error fetching company name: {e}")
+
             new_content = {k: v for k, v in message_content.items() if k not in payload}
             payload.update(new_content)
             break
@@ -115,10 +138,14 @@ for jpg_file in jpg_files:
             files=files
         )
 
+    if not 200 <= response.status_code < 300:
+        print("エラーが発生しました")
+        print("ステータスコード:", response.status_code)
+        print("レスポンスヘッダー:", response.headers)
+        print("レスポンスボディ:", response.text)
+        exit(1)
 
     print("ステータスコード:", response.status_code)
-    print("レスポンスヘッダー:", response.headers)
-    print("レスポンスボディ:", response.text)
     try:
         json_response = response.json()
         print("JSONレスポンス:")

@@ -1,7 +1,6 @@
 import anthropic
 from anthropic.types.beta.message_create_params import MessageCreateParamsNonStreaming
 from anthropic.types.beta.messages.batch_create_params import Request
-from dotenv import load_dotenv
 import os
 import base64
 import glob
@@ -92,7 +91,7 @@ def process_image(image_path, is_first=False):
         message = client.beta.prompt_caching.messages.create(**message_params)
         print(message.content)
 
-jpg_files = glob.glob(os.path.join(source_dir, "b.jpg"))
+jpg_files = glob.glob(os.path.join(source_dir, "*.jpg"))
 for i, jpg_file in enumerate(jpg_files):
     print(f"Processing {jpg_file}...")
     process_image(jpg_file, is_first=(i==1))

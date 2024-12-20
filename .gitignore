@@ -43,8 +43,8 @@ wheels/
 Thumbs.db
 
 # 画像ファイル
-image/*
-!image/.gitkeep
+images/*
+!images/.gitkeep
 batched/*
 !batched/.gitkeep
 
