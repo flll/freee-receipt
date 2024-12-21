@@ -10,6 +10,7 @@ from PIL import Image
 from io import BytesIO
 from resize import resize_image
 import configparser
+import sys
 
 # 処理対象のディレクトリを指定
 source_dir = "./images"
@@ -91,8 +92,17 @@ def process_image(image_path, is_first=False):
         message = client.beta.prompt_caching.messages.create(**message_params)
         print(message.content)
 
-jpg_files = glob.glob(os.path.join(source_dir, "*.jpg"))
-for i, jpg_file in enumerate(jpg_files):
-    print(f"Processing {jpg_file}...")
-    process_image(jpg_file, is_first=(i==1))
-    print("-" * 80)
+if len(sys.argv) > 1:
+    jpg_file = os.path.join(source_dir, sys.argv[1])
+    if os.path.exists(jpg_file):
+        print(f"Processing {jpg_file}...")
+        process_image(jpg_file)
+        print("-" * 80)
+    else:
+        print(f"エラー: ファイル {jpg_file} が見つかりません")
+else:
+    jpg_files = glob.glob(os.path.join(source_dir, "*.jpg"))
+    for i, jpg_file in enumerate(jpg_files):
+        print(f"Processing {jpg_file}...")
+        process_image(jpg_file, is_first=(i==1))
+        print("-" * 80)

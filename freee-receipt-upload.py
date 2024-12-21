@@ -4,6 +4,8 @@ import glob
 import configparser
 import json
 from get_freee_token import get_current_token, refresh_token
+import re
+from pprint import pprint
 
 
 # 処理対象のディレクトリを指定
@@ -28,7 +30,6 @@ for jpg_file in jpg_files:
     print(f"処理中のファイル: {filename}")
     print(f"Batch ID: {batch_id}")
 
-    # 認証確認のためのデバッグ出力を追加
     try:
         message_batch = client.beta.messages.batches.retrieve(
             batch_id,
@@ -53,10 +54,8 @@ for jpg_file in jpg_files:
         match result.result.type:
             case "succeeded":
                 print(f"成功！ {result.custom_id} {batch_id}")
-                print(result.result.message.content[0].text)
             case "errored":
                 if result.result.error.type == "invalid_request":
-                    # リクエスト本文を修正してから再送信する必要があります
                     print(f"バリデーションエラー {result.custom_id} {batch_id}")
                     print("リクエスト本文を修正してから再送信する必要があります")
                     exit(1)
@@ -77,33 +76,34 @@ for jpg_file in jpg_files:
         "document_type": "receipt",
     }
 
-    # message_batchからの内容更新は維持
     for result in client.beta.messages.batches.results(batch_id):
         if result.result.type == "succeeded":
             message_text = result.result.message.content[0].text
 
-            if message_text.startswith('<output>'):
-                message_text = message_text.replace('<output>', '').replace('</output>', '').strip()
-
+            match = re.search(r'<output>(.*?)</output>', message_text, re.DOTALL)
+            if match:
+                message_text = match.group(1).strip()
+            
             message_content = json.loads(message_text)
             message_content['description'] = message_content['description'][:255]
 
-            if 'qualified_invoice' in message_content:
-                invoice_num = message_content['qualified_invoice']
+            if ('invoice_registration_number' in message_content and 
+                message_content.get('receipt_metadatum_partner_name') == 'unknown'):
+                invoice_num = message_content['invoice_registration_number']
                 if invoice_num.startswith('T') and len(invoice_num) == 14:
                     try:
                         sel_reg_no = invoice_num[1:]
                         url = f"https://www.invoice-kohyo.nta.go.jp/regno-search/detail?selRegNo={sel_reg_no}"
                         response = requests.get(url)
-
                         from bs4 import BeautifulSoup
                         soup = BeautifulSoup(response.text, 'html.parser')
-
-                        company_name = soup.select_one('p.itemdata.sp_nmTsuushou_data')
-                        if company_name:
-                            message_content['partner_name'] = company_name.text.strip()
+                        real_partner_name = soup.select_one('p.itemdata.sp_nmTsuushou_data')
+                        if real_partner_name:
+                            message_content['receipt_metadatum_partner_name'] = real_partner_name.text.strip()
                     except Exception as e:
-                        print(f"Error fetching company name: {e}")
+                        print(f"Error fetching partner_name: {e}")
+            del message_content['invoice_registration_number']
+            pprint(message_content, indent=2, width=80)
 
             new_content = {k: v for k, v in message_content.items() if k not in payload}
             payload.update(new_content)
