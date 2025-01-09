@@ -11,11 +11,13 @@ from io import BytesIO
 from resize import resize_image
 import configparser
 import sys
+import concurrent.futures
 
 # 処理対象のディレクトリを指定
 source_dir = "./images"
 target_dir = "./batched"
 batches_enabled = True
+MAX_WORKERS = 10
 
 
 config = configparser.ConfigParser()
@@ -60,9 +62,7 @@ def create_message_params(system_prompt, base64_image):
         ]
     }
 
-def process_image(image_path, is_first=False):
-    if is_first:
-        time.sleep(5)
+def process_image(image_path):
     custom_id = os.path.basename(image_path).replace('.', '_').replace('/', '_')
 
     with Image.open(image_path) as img:
@@ -92,6 +92,34 @@ def process_image(image_path, is_first=False):
         message = client.beta.prompt_caching.messages.create(**message_params)
         print(message.content)
 
+def process_images(jpg_files):
+    if not jpg_files:
+        return
+
+    # 最初の1件を処理
+    first_file = jpg_files[0]
+    print(f"最初の画像を処理中: {first_file}")
+    process_image(first_file)
+    time.sleep(5)
+
+    # 残りの画像を並列処理
+    remaining_files = jpg_files[1:]
+    if not remaining_files:
+        return
+
+    print("残りの画像を並列処理開始")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = []
+        for jpg_file in remaining_files:
+            future = executor.submit(process_image, jpg_file)
+            futures.append(future)
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"エラーが発生しました: {str(e)}")
+
 if len(sys.argv) > 1:
     jpg_file = os.path.join(source_dir, sys.argv[1])
     if os.path.exists(jpg_file):
@@ -102,7 +130,4 @@ if len(sys.argv) > 1:
         print(f"エラー: ファイル {jpg_file} が見つかりません")
 else:
     jpg_files = glob.glob(os.path.join(source_dir, "*.jpg"))
-    for i, jpg_file in enumerate(jpg_files):
-        print(f"Processing {jpg_file}...")
-        process_image(jpg_file, is_first=(i==1))
-        print("-" * 80)
+    process_images(jpg_files)
