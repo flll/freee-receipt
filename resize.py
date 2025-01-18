@@ -2,7 +2,7 @@ from PIL import Image
 
 def resize_image(img):
     """
-    PIL Imageオブジェクトを受け取り、必要に応じてリサイズしたImageオブジェクトを返す
+    PIL Imageオブジェクトを受け取り、リサイズしたImageオブジェクトを返す
     """
     width, height = img.size
 

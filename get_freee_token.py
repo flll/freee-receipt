@@ -70,17 +70,47 @@ def refresh_access_token(refresh_token):
 
 def get_current_token():
     """現在の有効なトークンを取得する関数"""
-    saved_tokens = load_tokens()
-    if not saved_tokens['refresh_token']:
-        raise Exception("トークンが存在しません")
-    return refresh_access_token(saved_tokens['refresh_token'])['access_token']
+    try:
+        saved_tokens = load_tokens()
+        if not saved_tokens['refresh_token']:
+            print("トークンが存在しません")
+            return None
+
+        return saved_tokens['access_token']
+        
+    except Exception as e:
+        print(f"トークン取得エラー: {e}")
+        return None
 
 def refresh_token():
     """外部から呼び出し可能なリフレッシュ関数"""
     saved_tokens = load_tokens()
     if not saved_tokens['refresh_token']:
-        raise Exception("トークンが存在しません")
-    return refresh_access_token(saved_tokens['refresh_token'])
+        print("リフレッシュトークンが存在しません")
+        return None
+    
+    url = TOKEN_URL
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": saved_tokens['refresh_token'],
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "redirect_uri": REDIRECT_URI
+    }
+    
+    try:
+        response = requests.post(url, headers=HEADERS, data=data)
+        if response.status_code == 200:
+            tokens = response.json()
+            save_tokens(tokens['access_token'], tokens['refresh_token'])
+            return tokens
+        else:
+            print(f"トークン更新エラー: {response.status_code}")
+            print(response.text)
+            return None
+    except Exception as e:
+        print(f"トークン更新中の例外: {e}")
+        return None
 
 def main():
     saved_tokens = load_tokens()
